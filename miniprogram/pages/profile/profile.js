@@ -15,9 +15,9 @@ Page({
       { key: 'expressionAbility', label: '表达能力' }
     ],
     disabilityOptions: [
-      { code: 'ASD', label: '孤独症谱系障碍（ASD）' },
+      { code: 'ASD', label: '孤独症谱系障碍' },
       { code: 'ID', label: '智力障碍' },
-      { code: 'ADHD', label: '注意缺陷多动障碍（ADHD）' },
+      { code: 'ADHD', label: '注意缺陷多动障碍' },
       { code: 'SLD', label: '言语语言障碍' },
       { code: 'LD', label: '学习障碍' },
       { code: 'DD', label: '发育迟缓' },

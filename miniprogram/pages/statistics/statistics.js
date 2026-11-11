@@ -129,6 +129,8 @@ Page({
   },
 
   async loadData(view) {
+    // 切换视图时立即作废上一个视图尚未返回的 AI 请求
+    this._aiReqId = (this._aiReqId || 0) + 1;
     if (view === 'semester') { this.loadSemester(); return; }
     var pm = { daily: 'DAILY', weekly: 'WEEKLY', monthly: 'MONTHLY' };
     var period = pm[view]; if (!period) return;
@@ -204,8 +206,8 @@ Page({
    * @param {string} [referenceDate] - 参考日期，用于确保统计和 AI 报告使用相同的日期范围
    */
   async _loadAiReport(period, referenceDate) {
-    if (this._aiLoading) return;
-    this._aiLoading = true;
+    this._aiReqId = (this._aiReqId || 0) + 1;
+    var reqId = this._aiReqId;
     this.setData({ aiReport: null, aiReportLoading: true });
     try {
       var ds = referenceDate || today();
@@ -213,11 +215,13 @@ Page({
       var report;
       try {
         report = await aiApi.getAiReport(period, ds);
+        if (reqId !== this._aiReqId) return; // 过期响应，丢弃
         console.log('[statistics] AI API response:', report);
         // 将后端 SEAT 格式转换为前端三维度格式
         report = transformAiReport(report);
         console.log('[statistics] AI report transformed:', report);
       } catch (_apiErr) {
+        if (reqId !== this._aiReqId) return; // 过期响应，丢弃
         console.warn('[statistics] AI API failed, using mock data:', _apiErr);
         if (period === 'SEMESTER') {
           report = aiMock.SEMESTER;
@@ -227,20 +231,25 @@ Page({
           report = aiMock.MONTHLY;
         }
       }
+      if (reqId !== this._aiReqId) return; // 过期响应，丢弃
       console.log('[statistics] setting aiReport to:', !!report, 'keys:', report && Object.keys(report));
       this.setData({ aiReport: report });
       console.log('[statistics] aiReport set complete');
     } catch (err) {
+      if (reqId !== this._aiReqId) return; // 过期响应，丢弃
       console.error('[statistics] _loadAiReport error:', err);
       this.setData({ aiReport: null });
     } finally {
-      this._aiLoading = false;
-      this.setData({ aiReportLoading: false });
+      // 只有最新的请求才能结束 loading，避免旧请求提前关掉新请求的 loading
+      if (reqId === this._aiReqId) {
+        this.setData({ aiReportLoading: false });
+      }
     }
   },
 
   async loadSemester() {
-    this._aiLoading = false;
+    // 切换学期时立即作废尚未返回的 AI 请求
+    this._aiReqId = (this._aiReqId || 0) + 1;
     this.setData({ loading: true, empty: false, aiReport: null, aiReportLoading: false });
     try {
       var sem = this.data.semesterOptions[this.data.semesterIndex];
